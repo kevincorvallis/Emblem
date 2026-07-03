@@ -1,0 +1,107 @@
+name: Emblem
+options:
+  bundleIdPrefix: page.klee
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: 4F8Q446767
+    CODE_SIGN_STYLE: Automatic
+    DEAD_CODE_STRIPPING: YES
+    SWIFT_VERSION: "5.9"
+
+targets:
+  Emblem:
+    type: application
+    platform: macOS
+    sources:
+      - path: Emblem
+    settings:
+      base:
+        INFOPLIST_FILE: Emblem/App/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: page.klee.emblem
+        PRODUCT_NAME: Emblem
+    dependencies:
+      - target: EmblemCore
+        embed: true
+        codeSign: true
+      - target: IconAppTemplate
+        copy:
+          destination: resources
+          subpath: ""
+
+  EmblemCore:
+    type: framework
+    platform: macOS
+    sources:
+      - path: EmblemCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: page.klee.emblem.core
+        PRODUCT_NAME: EmblemCore
+        GENERATE_INFOPLIST_FILE: YES
+
+  IconAppTemplate:
+    type: application
+    platform: macOS
+    sources:
+      - path: IconAppTemplate/IconApp
+    settings:
+      base:
+        INFOPLIST_FILE: IconAppTemplate/IconApp/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: page.klee.emblem.template
+        PRODUCT_NAME: IconAppTemplate
+        SKIP_INSTALL: YES
+    dependencies:
+      - target: IconAppTemplateSync
+        embed: true
+        codeSign: true
+
+  IconAppTemplateSync:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: IconAppTemplate/FinderSync
+    settings:
+      base:
+        INFOPLIST_FILE: IconAppTemplate/FinderSync/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: page.klee.emblem.template.sync
+        PRODUCT_NAME: IconAppSync
+        PRODUCT_MODULE_NAME: IconAppSync
+        CODE_SIGN_ENTITLEMENTS: IconAppTemplate/FinderSync/FinderSync.entitlements
+        SKIP_INSTALL: YES
+
+  EmblemCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/EmblemCoreTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: page.klee.emblem.coretests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: EmblemCore
+        embed: true
+      - target: IconAppTemplate
+        copy:
+          destination: resources
+          subpath: ""
+
+schemes:
+  Emblem:
+    build:
+      targets:
+        Emblem: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - EmblemCoreTests
+    profile:
+      config: Release
+    archive:
+      config: Release
