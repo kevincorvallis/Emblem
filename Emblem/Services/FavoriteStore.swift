@@ -1,0 +1,149 @@
+import SwiftUI
+import AppKit
+import EmblemCore
+
+enum FavoriteStatus: Equatable {
+    case generating
+    case active
+    case awaitingSetup
+    case folderMissing
+    case error(String)
+}
+
+/// UI-facing state: wraps ConfigStore + IconAppEngine and tracks per-favorite status.
+@Observable @MainActor
+final class FavoriteStore {
+    private let configStore: ConfigStore
+    private let engine: IconAppEngine
+
+    private(set) var favorites: [Favorite] = []
+    private(set) var statuses: [UUID: FavoriteStatus] = [:]
+    var settings: Config.Settings
+
+    init(configStore: ConfigStore = ConfigStore()) {
+        self.configStore = configStore
+        self.engine = IconAppEngine(
+            store: configStore,
+            templateURL: Bundle.main.url(forResource: "IconAppTemplate", withExtension: "app"))
+        self.favorites = configStore.config.favorites
+        self.settings = configStore.config.settings
+    }
+
+    var iconsDirectoryURL: URL { configStore.iconsDirectoryURL }
+
+    func customIconURL(relativePath: String) -> URL {
+        configStore.customIconURL(relativePath: relativePath)
+    }
+
+    // MARK: - CRUD + generation
+
+    /// Persists the favorite, regenerates its icon app, and launches it hidden.
+    /// Returns the persisted favorite (updatedAt refreshed) or nil on failure.
+    @discardableResult
+    func addOrUpdate(_ favorite: Favorite) async -> Favorite? {
+        statuses[favorite.id] = .generating
+        do {
+            if configStore.favorite(id: favorite.id) != nil {
+                try configStore.updateFavorite(favorite)
+            } else {
+                try configStore.addFavorite(favorite)
+            }
+            favorites = configStore.config.favorites
+
+            guard let saved = configStore.favorite(id: favorite.id) else { return nil }
+            try await engine.generate(for: saved)
+            await launchIconApp(for: saved)
+            await refreshStatus(for: saved)
+            return saved
+        } catch {
+            statuses[favorite.id] = .error(error.localizedDescription)
+            favorites = configStore.config.favorites
+            return nil
+        }
+    }
+
+    func delete(_ favorite: Favorite) async {
+        try? await engine.remove(for: favorite)
+        terminateIconApp(for: favorite)
+        try? configStore.removeFavorite(id: favorite.id)
+        favorites = configStore.config.favorites
+        statuses[favorite.id] = nil
+    }
+
+    func regenerate(_ favorite: Favorite) async {
+        _ = await addOrUpdate(favorite)
+    }
+
+    // MARK: - Status
+
+    func refreshStatuses() async {
+        for favorite in favorites {
+            await refreshStatus(for: favorite)
+        }
+    }
+
+    func refreshStatus(for favorite: Favorite) async {
+        if !FileManager.default.fileExists(atPath: favorite.expandedFolderPath) {
+            statuses[favorite.id] = .folderMissing
+            return
+        }
+        let enabled = await engine.isExtensionEnabled(for: favorite)
+        statuses[favorite.id] = enabled ? .active : .awaitingSetup
+    }
+
+    // MARK: - Icon app processes
+
+    /// Icon apps are LSBackgroundOnly stubs; launching them (hidden) helps Launch
+    /// Services and System Settings pick up the extension — upstream behavior.
+    func launchIconApp(for favorite: Favorite) async {
+        let appURL = configStore.iconAppURL(for: favorite)
+        guard FileManager.default.fileExists(atPath: appURL.path) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        configuration.hides = true
+        _ = try? await NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+    }
+
+    private func terminateIconApp(for favorite: Favorite) {
+        for app in NSWorkspace.shared.runningApplications
+        where app.bundleIdentifier == favorite.bundleIdentifier {
+            app.terminate()
+        }
+    }
+
+    func restartFinder() async {
+        await engine.restartFinder()
+    }
+
+    // MARK: - Settings
+
+    func saveSettings() {
+        try? configStore.updateSettings(settings)
+    }
+
+    func availableSigningIdentities() async -> [String] {
+        await engine.availableSigningIdentities()
+    }
+
+    // MARK: - Housekeeping
+
+    func orphanedApps() -> [URL] {
+        configStore.orphanedIconApps()
+    }
+
+    func cleanOrphans() async {
+        for orphan in configStore.orphanedIconApps() {
+            try? await engine.removeOrphan(at: orphan)
+        }
+    }
+
+    /// Full teardown: every generated icon app removed and unregistered.
+    func uninstallAll() async {
+        for favorite in favorites {
+            try? await engine.remove(for: favorite)
+            terminateIconApp(for: favorite)
+        }
+        await cleanOrphans()
+        statuses = [:]
+    }
+}
