@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install tools
+        run: brew install xcodegen xcbeautify
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build and test
+        # No signing identities on runners: the engine's Automatic resolution
+        # falls back to ad-hoc, which the integration tests accept.
+        run: |
+          xcodebuild test \
+            -project Emblem.xcodeproj \
+            -scheme Emblem \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
+            CODE_SIGN_STYLE=Manual \
+            | xcbeautify --renderer github-actions || exit ${PIPESTATUS[0]}
