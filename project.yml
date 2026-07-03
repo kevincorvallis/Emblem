@@ -85,10 +85,6 @@ targets:
     dependencies:
       - target: EmblemCore
         embed: true
-      - target: IconAppTemplate
-        copy:
-          destination: resources
-          subpath: ""
 
 schemes:
   Emblem:
