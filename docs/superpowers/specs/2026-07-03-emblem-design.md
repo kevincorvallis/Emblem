@@ -118,7 +118,7 @@ Emblem/
 
 **Shell conventions:** SwiftUI with `@Observable` models, structured concurrency (`async`/`await`), no Combine, no singletons in the UI layer (engine services injected). All `Process` invocations (`actool`, `codesign`, `lsregister`, `pluginkit`, `security`, `killall`) run off the main actor via a small `async` subprocess helper with captured output.
 
-**SymbolCatalog:** enumerates system symbols at runtime from macOS's `CoreGlyphs.bundle` (`/System/Library/CoreServices/CoreGlyphs.bundle`, `symbol_order.plist` / `name_availability.plist`), with `NSImage(systemSymbolName:accessibilityDescription:)` as the per-name validity check and fallback. Categories from `symbol_categories.plist` when present. This replaces upstream's 529-line hardcoded validator list and never goes stale when macOS adds symbols. If the bundle format changes in a future macOS, the catalog degrades gracefully: search-by-name still validates via `NSImage`.
+**SymbolCatalog:** enumerates system symbols at runtime from macOS's `CoreGlyphs.bundle` (`/System/Library/CoreServices/CoreGlyphs.bundle`, `symbol_order.plist` / `name_availability.plist`), with `NSImage(systemSymbolName:accessibilityDescription:)` as the per-name validity check and fallback. This is private system data (confirmed still present on macOS 26): if parsing fails, the catalog degrades gracefully to the curated list + `NSImage` name validation. Upstream's `SymbolValidator` (SVG template validation + preview rendering) ports into `SVGSymbolTemplate`; it is unrelated to symbol enumeration.
 
 **Data storage:**
 
