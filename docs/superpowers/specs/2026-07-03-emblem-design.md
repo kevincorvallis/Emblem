@@ -1,7 +1,7 @@
 # Emblem — Design Spec
 
 **Date:** 2026-07-03
-**Status:** Approved pending user review
+**Status:** Approved (adversarially reviewed by GPT-5.5 and Gemini 3.1 Pro on 2026-07-03; refinements below)
 **Repo:** `kevinlee/Emblem` (fresh history, not a GitHub fork)
 **Derived from:** [ivg-design/SidebarFavorites](https://github.com/ivg-design/SidebarFavorites) (MIT)
 
@@ -55,7 +55,7 @@ Known platform limits (documented in-app, not fixable):
 ### Add/Edit sheet
 
 - Name + folder path (Browse via `NSOpenPanel`, `resolvesAliases = false` to preserve symlinks; `~` abbreviation preserved for display).
-- **SF Symbol browser**: scrollable grid of all system symbols with live search and category filter, sourced from `SymbolCatalog` (see §4). Click to select; selected symbol previewed in a mock sidebar row.
+- **SF Symbol browser**: defaults to a curated "Recommended" grid (~200 folder-appropriate symbols — folders, documents, media, dev tools); live search spans **all** system symbols from `SymbolCatalog` (see §4), with a "Show All" toggle for the full set. The curated list is hardcoded and doubles as the fallback catalog if `CoreGlyphs.bundle` parsing ever fails. Click to select; selected symbol previewed in a mock sidebar row.
 - **Custom SVG**: import an SF Symbol template SVG or export a blank template. The exported template must re-import cleanly (fixes upstream #6): export and validation use the same schema, and validation errors state exactly which field failed.
 - Live preview renders the icon in a fake sidebar row (as upstream) for both symbol types.
 
@@ -63,17 +63,18 @@ Known platform limits (documented in-app, not fixable):
 
 Classify the chosen path:
 
-- **Cloud storage** (path under `~/Library/CloudStorage/` or resolving into it): explain the FileProvider limitation and offer **"Create symlink workaround"** — Emblem creates `~/<name>` (user-adjustable location) pointing at the cloud folder and uses the symlink as the favorite (upstream #8).
+- **Cloud storage** (path under `~/Library/CloudStorage/` or resolving into it): explain the FileProvider limitation plainly. Symlink creation is offered as an explicit **Advanced** action with its caveats stated (the symlink is what lives in the sidebar; it can break if the cloud provider re-mounts) — not a default path (upstream #8, tempered per adversarial review).
 - **TCC-protected** (Desktop, Documents, Downloads): warn upfront that FinderSync may not fire without Full Disk Access for the icon app, link to the relevant System Settings pane, and let the user proceed knowingly (upstream #12, upstream PR #11's guidance built into the product).
 - **Normal**: proceed silently.
 
 ### Guided setup checklist (after save)
 
-A three-step checklist replaces upstream's README-driven setup:
+A four-step checklist replaces upstream's README-driven setup. The "drag into sidebar" step is explicit — it's the step users actually fail at, and Emblem cannot do it programmatically:
 
 1. **Icon app generated** — done automatically, shows spinner during generation (generation is async; never blocks UI).
-2. **Enable the extension** — button deep-links to System Settings' Extensions pane (`x-apple.systempreferences:com.apple.ExtensionsPreferences`). Emblem polls `pluginkit` every ~2s while this step is pending and ticks it automatically when the toggle flips.
-3. **Restart Finder** — one-click `killall Finder`, with a note that the folder must be dragged into the sidebar Favorites if it isn't there yet.
+2. **Enable the extension** — button deep-links to System Settings' Extensions pane (`x-apple.systempreferences:com.apple.ExtensionsPreferences?extension-points`, plain `ExtensionsPreferences` as fallback), plus textual guidance "General → Login Items & Extensions → Finder". Emblem polls `pluginkit` every ~2s **only while this step is pending** (with backoff, stops when done or window closes) and ticks the step automatically when the toggle flips.
+3. **Drag the folder into the sidebar** — a visual instruction (mock sidebar illustration + "Reveal in Finder" button) showing exactly what to drag where. Skippable if already in the sidebar.
+4. **Restart Finder** — one-click `killall Finder` to bust the icon cache.
 
 ### Menu bar (`MenuBarExtra`)
 
@@ -83,11 +84,11 @@ A three-step checklist replaces upstream's README-driven setup:
 
 - Signing identity picker (Automatic / Ad-hoc / Apple Development / Developer ID) with live detection of available identities.
 - Launch at login (`SMAppService`).
-- Check for updates (GitHub Releases API; see §7).
+- **Uninstall all icon apps** — removes every generated app (pluginkit ignore → lsregister -u → delete), for clean removal of Emblem itself.
 
-### First-launch import
+### Housekeeping
 
-If `~/Library/Application Support/SidebarFavorites/config.json` exists, offer to import those favorites (map fields, copy custom SVGs, regenerate icon apps under Emblem's IDs). Decline = never ask again.
+At launch, Emblem scans `Apps/` for orphaned icon apps (present on disk but absent from config) and offers to clean them up. Prevents the upstream failure mode of generated apps accumulating forever.
 
 ## 4. Architecture
 
@@ -104,7 +105,7 @@ Emblem/
 │   ├── IconAppEngine.swift      # from upstream IconAppGenerator (see §5)
 │   ├── SymbolCatalog.swift      # runtime SF Symbol enumeration + validation
 │   ├── SVGSymbolTemplate.swift  # parse/generate/validate SF Symbol template SVGs
-│   ├── ConfigStore.swift        # Codable persistence + SidebarFavorites import
+│   ├── ConfigStore.swift        # Codable persistence, orphan detection
 │   └── PathClassifier.swift     # normal / cloudStorage / tccProtected
 ├── IconAppTemplate/             # Ported as-is: IconApp main.swift + FinderSync appex
 ├── Tests/
@@ -145,7 +146,7 @@ Emblem/
 - `SVGSymbolTemplate`: symbol-name extraction from `descriptive-name`; export → validate → import round-trip (regression test for upstream #6); rejection messages name the failing field.
 - Plist mutation: given a template plist, assert exact resulting keys (bundle IDs, symbol name, version derivation).
 - `PathClassifier`: home subfolders vs `~/Library/CloudStorage/...` vs Desktop/Documents/Downloads, including symlink-into-cloud cases.
-- `ConfigStore`: encode/decode, schema version handling, SidebarFavorites config import mapping.
+- `ConfigStore`: encode/decode, schema version handling, orphan detection against a fixture Apps/ directory.
 - `SymbolCatalog`: known-good symbol validates, garbage name rejects; catalog non-empty on the runner.
 
 **Integration (macOS runner, run in CI):** run the real pipeline — generate an icon app for a temp folder with (a) a system symbol and (b) a fixture custom SVG; assert the bundle's plist contents, `Assets.car` presence for (b), and `codesign --verify` passes with ad-hoc identity. `pluginkit`/System Settings enablement is not CI-testable and stays manual.
@@ -154,7 +155,8 @@ Emblem/
 
 - **`ci.yml`** — on push/PR: `xcodegen generate` → build → run unit + integration tests (macOS runner).
 - **`release.yml`** — on `v*` tag: Release build, `scripts/build-release.sh` produces a DMG, GitHub Release created with the DMG attached and changelog notes. Ad-hoc signing (README documents the right-click-Open first-run dance, as upstream). The workflow is structured so a Developer ID signing + notarization step can be slotted in later without restructuring.
-- **Updates:** Settings has "Check for Updates" — compares the running version against the latest GitHub Release via the public API and links to the download. No Sparkle (out of scope; awkward without notarization).
+- **Updates:** via Homebrew cask / GitHub Releases page. No in-app update checker in v1 (cut per adversarial review), no Sparkle.
+- **CI note:** runners must select Xcode explicitly (`xcode-select` / `DEVELOPER_DIR`) — the default on GitHub macOS images may lag behind Xcode 26.
 - **Homebrew:** `packaging/emblem.rb` cask ready for a `kevinlee/homebrew-tap` repo (`brew install --cask kevinlee/tap/emblem`). Creating the tap repo is a post-release follow-up.
 
 ## 8. Branding & licensing
@@ -166,7 +168,8 @@ Emblem/
 
 ## 9. Out of scope
 
-- Sparkle auto-update framework, notarization, Mac App Store (sandboxing makes the whole approach impossible there)
+- Sparkle auto-update framework, in-app update checker, notarization, Mac App Store (sandboxing makes the whole approach impossible there)
+- Importing config from upstream SidebarFavorites (cut — no user base to migrate)
 - Programmatically adding folders to the sidebar (no supported API; user drags the folder in once)
 - Fixing FinderSync limitations for FileProvider/CloudStorage paths (symlink workaround is the ceiling)
 - Localization; Nix packaging
