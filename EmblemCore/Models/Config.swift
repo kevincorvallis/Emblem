@@ -27,19 +27,23 @@ public struct Config: Codable, Sendable {
         public var launchAtLogin: Bool
         public var showInMenuBar: Bool
         public var signingIdentity: SigningIdentity
+        /// Also stamp the folder's own Finder icon with the favorite's symbol.
+        public var matchFolderIcon: Bool
 
         enum CodingKeys: String, CodingKey {
-            case launchAtLogin, showInMenuBar, signingIdentity
+            case launchAtLogin, showInMenuBar, signingIdentity, matchFolderIcon
         }
 
         public init(
             launchAtLogin: Bool = false,
             showInMenuBar: Bool = true,
-            signingIdentity: SigningIdentity = .automatic
+            signingIdentity: SigningIdentity = .automatic,
+            matchFolderIcon: Bool = true
         ) {
             self.launchAtLogin = launchAtLogin
             self.showInMenuBar = showInMenuBar
             self.signingIdentity = signingIdentity
+            self.matchFolderIcon = matchFolderIcon
         }
 
         public init(from decoder: Decoder) throws {
@@ -47,6 +51,7 @@ public struct Config: Codable, Sendable {
             launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
             showInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showInMenuBar) ?? true
             signingIdentity = try container.decodeIfPresent(SigningIdentity.self, forKey: .signingIdentity) ?? .automatic
+            matchFolderIcon = try container.decodeIfPresent(Bool.self, forKey: .matchFolderIcon) ?? true
         }
     }
 

@@ -22,6 +22,13 @@ struct SettingsView: View {
                     .onChange(of: store.settings.showInMenuBar) { _, _ in
                         store.saveSettings()
                     }
+                Toggle("Match folder icons", isOn: Binding(
+                    get: { store.settings.matchFolderIcon },
+                    set: { store.setMatchFolderIcon($0) }
+                ))
+                Text("Stamps each favorite's folder with its symbol so the icon shows everywhere in Finder, not just the sidebar. SF Symbols only; fully reversible.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

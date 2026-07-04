@@ -51,6 +51,10 @@ final class FavoriteStore {
                 if old.appFileName != favorite.appFileName {
                     try? await engine.remove(for: old)
                 }
+                // Re-pointing the favorite leaves the old folder stamped.
+                if old.expandedFolderPath != favorite.expandedFolderPath {
+                    FolderIconStamper.reset(at: old.folderURL)
+                }
                 try configStore.updateFavorite(favorite)
             } else {
                 try configStore.addFavorite(favorite)
@@ -59,6 +63,7 @@ final class FavoriteStore {
 
             guard let saved = configStore.favorite(id: favorite.id) else { return nil }
             try await engine.generate(for: saved)
+            applyFolderIcon(for: saved)
             await launchIconApp(for: saved)
             await refreshStatus(for: saved, force: true)
             return saved
@@ -72,6 +77,7 @@ final class FavoriteStore {
     func delete(_ favorite: Favorite) async {
         try? await engine.remove(for: favorite)
         terminateIconApp(for: favorite)
+        FolderIconStamper.reset(at: favorite.folderURL)
         try? configStore.removeFavorite(id: favorite.id)
         favorites = configStore.config.favorites
         statuses[favorite.id] = nil
@@ -133,6 +139,28 @@ final class FavoriteStore {
         await engine.restartFinder()
     }
 
+    // MARK: - Folder icons
+
+    /// Stamps the favorite's folder with its symbol (SF Symbols only; custom
+    /// SVG stamping needs the template renderer and is a follow-up).
+    private func applyFolderIcon(for favorite: Favorite) {
+        guard settings.matchFolderIcon, favorite.iconType == .sfSymbol else { return }
+        try? FolderIconStamper.apply(symbolName: favorite.iconValue, to: favorite.folderURL)
+    }
+
+    /// Called when the Settings toggle flips: stamp or clear every favorite.
+    func setMatchFolderIcon(_ enabled: Bool) {
+        settings.matchFolderIcon = enabled
+        saveSettings()
+        for favorite in favorites {
+            if enabled {
+                applyFolderIcon(for: favorite)
+            } else {
+                FolderIconStamper.reset(at: favorite.folderURL)
+            }
+        }
+    }
+
     // MARK: - Settings
 
     func saveSettings() {
@@ -160,6 +188,7 @@ final class FavoriteStore {
         for favorite in favorites {
             try? await engine.remove(for: favorite)
             terminateIconApp(for: favorite)
+            FolderIconStamper.reset(at: favorite.folderURL)
         }
         await cleanOrphans()
         statuses = [:]
