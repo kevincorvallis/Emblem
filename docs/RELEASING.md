@@ -35,7 +35,7 @@ Repo → Settings → Secrets and variables → Actions:
 
 | Secret | Value |
 |---|---|
-| `MACOS_CERT_P12` | `base64 -i cert.p12` of the Developer ID identity (export from Keychain Access with a password) |
+| `MACOS_CERT_P12` | `base64 -i cert.p12` of the Developer ID identity. **Build the p12 with `openssl pkcs12 -export -legacy …`** — OpenSSL 3's default encryption makes macOS `security import` fail with "MAC verification failed (wrong password?)" |
 | `MACOS_CERT_PASSWORD` | that export password |
 | `NOTARY_KEY_P8` | `base64 -i AuthKey_XXXXXX.p8` |
 | `NOTARY_KEY_ID` | the API Key ID |
