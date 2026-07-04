@@ -36,8 +36,14 @@ struct AddEditSheet: View {
     @State private var iconValue = "folder.fill"
     @State private var customSVGPath: String?
 
-    @State private var showingSVGImporter = false
-    @State private var showingFolderPicker = false
+    /// One fileImporter, routed: SwiftUI ignores all but one .fileImporter per
+    /// view, so separate folder/SVG importers silently broke each other.
+    private enum ImportTarget {
+        case folder, svg
+    }
+
+    @State private var importTarget: ImportTarget = .folder
+    @State private var showingImporter = false
     @State private var exportingTemplate = false
     @State private var templateDocument: SVGFileDocument?
     @State private var symlinkNotice: String?
@@ -87,7 +93,10 @@ struct AddEditSheet: View {
                     TextField("Name", text: $name)
                     HStack {
                         TextField("Folder", text: $folderPath)
-                        Button("Browse…") { showingFolderPicker = true }
+                        Button("Browse…") {
+                            importTarget = .folder
+                            showingImporter = true
+                        }
                     }
                     pathBanner
                 }
@@ -138,21 +147,19 @@ struct AddEditSheet: View {
         .interactiveDismissDisabled(saving)
         .onAppear(perform: populate)
         .fileImporter(
-            isPresented: $showingFolderPicker,
-            allowedContentTypes: [.folder]
+            isPresented: $showingImporter,
+            allowedContentTypes: importTarget == .folder
+                ? [.folder]
+                : [UTType(filenameExtension: "svg") ?? .xml]
         ) { result in
-            if case .success(let url) = result {
+            guard case .success(let url) = result else { return }
+            switch importTarget {
+            case .folder:
                 folderPath = abbreviate(url.path)
                 if name.isEmpty {
                     name = url.lastPathComponent
                 }
-            }
-        }
-        .fileImporter(
-            isPresented: $showingSVGImporter,
-            allowedContentTypes: [UTType(filenameExtension: "svg") ?? .xml]
-        ) { result in
-            if case .success(let url) = result {
+            case .svg:
                 importSVG(from: url)
             }
         }
@@ -236,12 +243,16 @@ struct AddEditSheet: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer()
-                Button("Change…") { showingSVGImporter = true }
+                Button("Change…") {
+                    importTarget = .svg
+                    showingImporter = true
+                }
             }
         } else {
             HStack(spacing: 12) {
                 Button {
-                    showingSVGImporter = true
+                    importTarget = .svg
+                    showingImporter = true
                 } label: {
                     Label("Import SVG…", systemImage: "square.and.arrow.down")
                 }

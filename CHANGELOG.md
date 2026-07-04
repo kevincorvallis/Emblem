@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.5 — 2026-07-04
+
+- Fixed: Browse… and Import SVG… dialogs not opening — two file importers on
+  one view silently disabled each other; now a single routed importer
+
 ## 0.2.4 — 2026-07-04
 
 - UI refinements per HIG: tinted icon wells, capsule status badges,
