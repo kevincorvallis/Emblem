@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 — 2026-07-04
+
+- Fixed: System Settings showed generated apps by file name
+  ("meetings-fed41a12") — display names are now set on the app and extension
+- Fixed: ghost "IconAppTemplate" entries in Login Items & Extensions — the
+  embedded template now ships as a .bundle so macOS doesn't register it
+
 ## 0.2.2 — 2026-07-04
 
 - Fixed: Gatekeeper blocking generated icon apps ("could not verify … is free

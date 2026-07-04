@@ -32,6 +32,19 @@ targets:
         copy:
           destination: resources
           subpath: ""
+    postBuildScripts:
+      - name: Rename template to .bundle
+        # A nested .app inside Resources gets registered by Launch Services /
+        # ExtensionKit, littering System Settings with "IconAppTemplate" ghost
+        # entries. Shipping it as .bundle hides it; the engine renames back to
+        # .app when generating.
+        script: |
+          RES="${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          if [ -d "$RES/IconAppTemplate.app" ]; then
+            rm -rf "$RES/IconAppTemplate.bundle"
+            mv "$RES/IconAppTemplate.app" "$RES/IconAppTemplate.bundle"
+          fi
+        basedOnDependencyAnalysis: false
 
   EmblemCore:
     type: framework

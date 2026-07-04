@@ -75,6 +75,9 @@ public actor IconAppEngine {
 
         plist["CFBundleIdentifier"] = favorite.bundleIdentifier
         plist["CFBundleName"] = favorite.name
+        // Without a display name, System Settings shows the bundle's file name
+        // ("meetings-fed41a12") in Login Items & Extensions.
+        plist["CFBundleDisplayName"] = favorite.name
 
         var icons = plist["CFBundleIcons"] as? [String: Any] ?? [:]
         var primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any] ?? [:]
@@ -100,6 +103,7 @@ public actor IconAppEngine {
 
         plist["CFBundleIdentifier"] = favorite.extensionBundleIdentifier
         plist["CFBundleName"] = "\(favorite.name) Sync"
+        plist["CFBundleDisplayName"] = "\(favorite.name) Sync"  // template ships as "FinderSync"
         // FinderSync needs the full path; tilde forms don't resolve there.
         plist["SidebarFolderPaths"] = [favorite.expandedFolderPath]
 

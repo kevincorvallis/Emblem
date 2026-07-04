@@ -26,7 +26,8 @@ final class FavoriteStore {
         self.configStore = configStore
         self.engine = IconAppEngine(
             store: configStore,
-            templateURL: Bundle.main.url(forResource: "IconAppTemplate", withExtension: "app"))
+            templateURL: Bundle.main.url(forResource: "IconAppTemplate", withExtension: "bundle")
+                ?? Bundle.main.url(forResource: "IconAppTemplate", withExtension: "app"))
         self.favorites = configStore.config.favorites
         self.settings = configStore.config.settings
     }

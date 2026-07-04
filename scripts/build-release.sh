@@ -49,7 +49,8 @@ if [ "$IDENTITY" != "-" ]; then
   RUNTIME_ARGS=(--options runtime --timestamp)
 fi
 
-TEMPLATE="$APP/Contents/Resources/IconAppTemplate.app"
+TEMPLATE="$APP/Contents/Resources/IconAppTemplate.bundle"
+[ -d "$TEMPLATE" ] || TEMPLATE="$APP/Contents/Resources/IconAppTemplate.app"
 codesign --force --sign "$IDENTITY" "${RUNTIME_ARGS[@]+"${RUNTIME_ARGS[@]}"}" \
   "$TEMPLATE/Contents/PlugIns/IconAppSync.appex"
 codesign --force --sign "$IDENTITY" "${RUNTIME_ARGS[@]+"${RUNTIME_ARGS[@]}"}" "$TEMPLATE"
