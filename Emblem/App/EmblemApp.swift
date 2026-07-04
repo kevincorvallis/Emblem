@@ -30,7 +30,14 @@ struct EmblemApp: App {
             systemImage: "sidebar.left",
             isInserted: Binding(
                 get: { store.settings.showInMenuBar },
-                set: { store.settings.showInMenuBar = $0; store.saveSettings() }
+                set: { newValue in
+                    // macOS's MenuBarExtraController writes this binding back on
+                    // every scene update; an unconditional set retriggers the
+                    // update and spins the main thread forever (observed hang).
+                    guard newValue != store.settings.showInMenuBar else { return }
+                    store.settings.showInMenuBar = newValue
+                    store.saveSettings()
+                }
             )
         ) {
             MenuBarView()

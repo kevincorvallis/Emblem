@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — 2026-07-03
+
+- Fixed: main-thread hang ("not responding") caused by a feedback loop in the
+  menu-bar visibility binding — macOS writes the binding back on every scene
+  update; identical writes are now no-ops
+
 ## 0.2.0 — 2026-07-03
 
 - **Match folder icons**: favorites' folders get their symbol stamped as the
