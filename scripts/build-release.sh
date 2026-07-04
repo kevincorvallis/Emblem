@@ -49,6 +49,15 @@ if [ "$IDENTITY" != "-" ]; then
   RUNTIME_ARGS=(--options runtime --timestamp)
 fi
 
+# Ship the embedded template as .bundle: a nested .app in Resources gets
+# registered by Launch Services / ExtensionKit from every on-disk copy,
+# littering System Settings with "IconAppTemplate" ghosts. Renamed here (after
+# xcodebuild — renaming during the build breaks Xcode's nested-code signing);
+# the app looks for .bundle first, and the engine copies it out as .app.
+if [ -d "$APP/Contents/Resources/IconAppTemplate.app" ]; then
+  rm -rf "$APP/Contents/Resources/IconAppTemplate.bundle"
+  mv "$APP/Contents/Resources/IconAppTemplate.app" "$APP/Contents/Resources/IconAppTemplate.bundle"
+fi
 TEMPLATE="$APP/Contents/Resources/IconAppTemplate.bundle"
 [ -d "$TEMPLATE" ] || TEMPLATE="$APP/Contents/Resources/IconAppTemplate.app"
 codesign --force --sign "$IDENTITY" "${RUNTIME_ARGS[@]+"${RUNTIME_ARGS[@]}"}" \
