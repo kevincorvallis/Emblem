@@ -138,6 +138,10 @@ struct SetupChecklistView: View {
             .padding()
         }
         .frame(width: 480)
+        .frame(minHeight: 420)  // steps expand/collapse; anchor so the sheet doesn't snap
+        .animation(.default, value: extensionEnabled)
+        .animation(.default, value: draggedConfirmed)
+        .animation(.default, value: finderRestarted)
         .task {
             // Poll only while this sheet is up and the extension is still off.
             while !Task.isCancelled && !extensionEnabled {

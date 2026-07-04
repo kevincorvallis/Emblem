@@ -12,7 +12,12 @@ struct EmblemApp: App {
         }
         .windowResizability(.contentMinSize)
         .commands {
-            CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .newItem) {
+                Button("Add Favorite…") {
+                    store.addSheetRequested = true
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
         }
 
         Settings {
@@ -23,7 +28,10 @@ struct EmblemApp: App {
         MenuBarExtra(
             "Emblem",
             systemImage: "sidebar.left",
-            isInserted: .constant(store.settings.showInMenuBar)
+            isInserted: Binding(
+                get: { store.settings.showInMenuBar },
+                set: { store.settings.showInMenuBar = $0; store.saveSettings() }
+            )
         ) {
             MenuBarView()
                 .environment(store)

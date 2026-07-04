@@ -18,7 +18,8 @@ struct SymbolBrowser: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            // Search on its own row so the placeholder never wraps.
+            HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                 TextField("Search all symbols", text: $query)
@@ -32,16 +33,33 @@ struct SymbolBrowser: View {
                     }
                     .buttonStyle(.borderless)
                 }
+            }
+            .padding(6)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+
+            HStack {
                 Picker("", selection: $showAll) {
                     Text("Recommended").tag(false)
                     Text("All").tag(true)
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .frame(width: 170)
+
+                Spacer()
+
+                if symbols.isEmpty {
+                    Text("No symbols match “\(query)”")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(selection)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
-            .padding(6)
-            .background(Color(NSColor.controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
 
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 6)], spacing: 6) {
@@ -62,19 +80,9 @@ struct SymbolBrowser: View {
                         .help(symbol)
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.trailing, 16)  // keep the last column clear of the scrollbar
             }
-            .frame(height: 150)
-
-            if symbols.isEmpty {
-                Text("No symbols match “\(query)”")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(selection)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-            }
+            .frame(height: 162)  // exactly 4 rows: 4×36 + 3×6
         }
     }
 }

@@ -19,6 +19,8 @@ final class FavoriteStore {
     private(set) var favorites: [Favorite] = []
     private(set) var statuses: [UUID: FavoriteStatus] = [:]
     var settings: Config.Settings
+    /// Set by the ⌘N menu command; ContentView observes and opens the Add sheet.
+    var addSheetRequested = false
 
     init(configStore: ConfigStore = ConfigStore()) {
         self.configStore = configStore
@@ -43,7 +45,12 @@ final class FavoriteStore {
     func addOrUpdate(_ favorite: Favorite) async -> Favorite? {
         statuses[favorite.id] = .generating
         do {
-            if configStore.favorite(id: favorite.id) != nil {
+            if let old = configStore.favorite(id: favorite.id) {
+                // Renaming changes appFileName; remove the old bundle so it
+                // can't linger as a registered orphan.
+                if old.appFileName != favorite.appFileName {
+                    try? await engine.remove(for: old)
+                }
                 try configStore.updateFavorite(favorite)
             } else {
                 try configStore.addFavorite(favorite)
@@ -53,7 +60,7 @@ final class FavoriteStore {
             guard let saved = configStore.favorite(id: favorite.id) else { return nil }
             try await engine.generate(for: saved)
             await launchIconApp(for: saved)
-            await refreshStatus(for: saved)
+            await refreshStatus(for: saved, force: true)
             return saved
         } catch {
             statuses[favorite.id] = .error(error.localizedDescription)
@@ -82,7 +89,18 @@ final class FavoriteStore {
         }
     }
 
-    func refreshStatus(for favorite: Favorite) async {
+    /// Recomputes a favorite's status. A background refresh (list/menu-bar
+    /// polling) must not clobber an in-flight `.generating` — only the
+    /// generation completion path passes `force`.
+    func refreshStatus(for favorite: Favorite, force: Bool = false) async {
+        if !force {
+            switch statuses[favorite.id] {
+            case .generating, .error:
+                return  // in-flight or needs user attention; don't clobber
+            default:
+                break
+            }
+        }
         if !FileManager.default.fileExists(atPath: favorite.expandedFolderPath) {
             statuses[favorite.id] = .folderMissing
             return

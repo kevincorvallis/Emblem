@@ -45,6 +45,7 @@ struct AddEditSheet: View {
     @State private var showingSVGError = false
     @State private var showingTemplateSaved = false
     @State private var saving = false
+    @State private var saveError: String?
 
     init(favorite: Favorite?, prefillPath: String?, onSaved: @escaping (Favorite) -> Void) {
         self.existingFavorite = favorite
@@ -60,6 +61,10 @@ struct AddEditSheet: View {
 
     private var isValid: Bool {
         guard !name.isEmpty, !folderPath.isEmpty else { return false }
+        var isDir: ObjCBool = false
+        let expanded = (folderPath as NSString).expandingTildeInPath
+        guard FileManager.default.fileExists(atPath: expanded, isDirectory: &isDir),
+              isDir.boolValue else { return false }
         switch iconType {
         case .sfSymbol: return SymbolCatalog.isValid(iconValue)
         case .custom: return customSVGPath != nil
@@ -113,7 +118,12 @@ struct AddEditSheet: View {
             HStack {
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .disabled(saving)
                 Spacer()
+                if saving {
+                    ProgressView().controlSize(.small)
+                        .padding(.trailing, 8)
+                }
                 Button(isEditing ? "Save" : "Add") {
                     save()
                 }
@@ -123,7 +133,8 @@ struct AddEditSheet: View {
             }
             .padding()
         }
-        .frame(width: 520, height: 640)
+        .frame(width: 520, height: 700)
+        .interactiveDismissDisabled(saving)
         .onAppear(perform: populate)
         .fileImporter(
             isPresented: $showingFolderPicker,
@@ -153,6 +164,14 @@ struct AddEditSheet: View {
             if case .success = result {
                 showingTemplateSaved = true
             }
+        }
+        .alert(
+            "Couldn't Save Favorite",
+            isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveError ?? "")
         }
         .alert("Invalid SVG Template", isPresented: $showingSVGError) {
             Button("OK", role: .cancel) {}
@@ -365,9 +384,15 @@ struct AddEditSheet: View {
         Task {
             let saved = await store.addOrUpdate(favorite)
             saving = false
-            dismiss()
             if let saved {
+                dismiss()
                 onSaved(saved)
+            } else {
+                if case .error(let message) = store.statuses[favorite.id] {
+                    saveError = message
+                } else {
+                    saveError = "Something went wrong while generating the icon app."
+                }
             }
         }
     }

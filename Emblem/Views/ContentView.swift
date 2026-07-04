@@ -8,6 +8,9 @@ struct ContentView: View {
     @State private var showingAddSheet = false
     @State private var addPrefillPath: String?
     @State private var setupFavorite: Favorite?
+    /// Set by the add/edit sheet's save; promoted to setupFavorite in onDismiss
+    /// so the two sheet presentations never race.
+    @State private var pendingSetup: Favorite?
     @State private var orphans: [URL] = []
     @State private var showingOrphanPrompt = false
 
@@ -32,19 +35,22 @@ struct ContentView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first(where: \.hasDirectoryPath) else { return false }
+            var isDir: ObjCBool = false
+            guard let url = urls.first(where: {
+                FileManager.default.fileExists(atPath: $0.path, isDirectory: &isDir) && isDir.boolValue
+            }) else { return false }
             addPrefillPath = url.path
             showingAddSheet = true
             return true
         }
-        .sheet(isPresented: $showingAddSheet) {
+        .sheet(isPresented: $showingAddSheet, onDismiss: promotePendingSetup) {
             AddEditSheet(favorite: nil, prefillPath: addPrefillPath) { saved in
-                setupFavorite = saved
+                pendingSetup = saved
             }
         }
-        .sheet(item: $editingFavorite) { favorite in
+        .sheet(item: $editingFavorite, onDismiss: promotePendingSetup) { favorite in
             AddEditSheet(favorite: favorite, prefillPath: nil) { saved in
-                setupFavorite = saved
+                pendingSetup = saved
             }
         }
         .sheet(item: $setupFavorite) { favorite in
@@ -55,6 +61,13 @@ struct ContentView: View {
             orphans = store.orphanedApps()
             showingOrphanPrompt = !orphans.isEmpty
         }
+        .onChange(of: store.addSheetRequested) { _, requested in
+            if requested {
+                store.addSheetRequested = false
+                addPrefillPath = nil
+                showingAddSheet = true
+            }
+        }
         .alert("Leftover Icon Apps Found", isPresented: $showingOrphanPrompt) {
             Button("Clean Up") {
                 Task { await store.cleanOrphans() }
@@ -62,6 +75,13 @@ struct ContentView: View {
             Button("Ignore", role: .cancel) {}
         } message: {
             Text("\(orphans.count) generated icon app(s) on disk don't belong to any current favorite. Remove them?")
+        }
+    }
+
+    private func promotePendingSetup() {
+        if let pending = pendingSetup {
+            pendingSetup = nil
+            setupFavorite = pending
         }
     }
 
