@@ -2,8 +2,8 @@
 # On each release: update version and sha256 (printed by the release workflow,
 # or `shasum -a 256` the GitHub release DMG), then copy to the tap repo.
 cask "emblem" do
-  version "0.2.2"
-  sha256 "4e95eee53cbe2e27cee9eadbf59a33d8872ea67ea8b89db2e059a6588747f947"
+  version "0.2.3"
+  sha256 "3c1e853ca82fab9f53a0424edf1893c2b9ca48649dea9f8442e942f30b662b38"
 
   url "https://github.com/kevincorvallis/Emblem/releases/download/v#{version}/Emblem-#{version}.dmg"
   name "Emblem"
