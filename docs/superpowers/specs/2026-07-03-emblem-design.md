@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-03
 **Status:** Approved (adversarially reviewed by GPT-5.5 and Gemini 3.1 Pro on 2026-07-03; refinements below)
-**Repo:** `kevinlee/Emblem` (fresh history, not a GitHub fork)
+**Repo:** `kevincorvallis/Emblem` (fresh history, not a GitHub fork)
 **Derived from:** [ivg-design/SidebarFavorites](https://github.com/ivg-design/SidebarFavorites) (MIT)
 
 ## 1. Overview
@@ -112,7 +112,7 @@ Emblem/
 │   ├── EmblemCoreTests/         # unit tests
 │   └── IntegrationTests/        # full generation pipeline test
 ├── scripts/                     # build-release.sh (DMG)
-├── packaging/emblem.rb          # Homebrew cask definition (for kevinlee/homebrew-tap)
+├── packaging/emblem.rb          # Homebrew cask definition (for kevincorvallis/homebrew-tap)
 └── .github/workflows/           # ci.yml, release.yml
 ```
 
@@ -157,7 +157,7 @@ Emblem/
 - **`release.yml`** — on `v*` tag: Release build, `scripts/build-release.sh` produces a DMG, GitHub Release created with the DMG attached and changelog notes. Ad-hoc signing (README documents the right-click-Open first-run dance, as upstream). The workflow is structured so a Developer ID signing + notarization step can be slotted in later without restructuring.
 - **Updates:** via Homebrew cask / GitHub Releases page. No in-app update checker in v1 (cut per adversarial review), no Sparkle.
 - **CI note:** runners must select Xcode explicitly (`xcode-select` / `DEVELOPER_DIR`) — the default on GitHub macOS images may lag behind Xcode 26.
-- **Homebrew:** `packaging/emblem.rb` cask ready for a `kevinlee/homebrew-tap` repo (`brew install --cask kevinlee/tap/emblem`). Creating the tap repo is a post-release follow-up.
+- **Homebrew:** `packaging/emblem.rb` cask ready for a `kevincorvallis/homebrew-tap` repo (`brew install --cask kevincorvallis/tap/emblem`). Creating the tap repo is a post-release follow-up.
 
 ## 8. Branding & licensing
 

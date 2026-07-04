@@ -21,7 +21,7 @@ The generated apps are self-sufficient — Emblem doesn't need to stay running.
 Requires Xcode 15+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen):
 
 ```bash
-git clone https://github.com/kevinlee/Emblem.git && cd Emblem
+git clone https://github.com/kevincorvallis/Emblem.git && cd Emblem
 brew install xcodegen
 xcodegen generate
 xcodebuild -scheme Emblem -configuration Release build
