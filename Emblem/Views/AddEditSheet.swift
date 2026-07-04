@@ -2,6 +2,25 @@ import SwiftUI
 import UniformTypeIdentifiers
 import EmblemCore
 
+/// Minimal wrapper so the blank SVG template can be saved via fileExporter.
+struct SVGFileDocument: FileDocument {
+    static let readableContentTypes: [UTType] = [UTType(filenameExtension: "svg") ?? .xml]
+
+    var data: Data
+
+    init(data: Data) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        data = configuration.file.regularFileContents ?? Data()
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
+    }
+}
+
 struct AddEditSheet: View {
     @Environment(FavoriteStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -18,6 +37,10 @@ struct AddEditSheet: View {
     @State private var customSVGPath: String?
 
     @State private var showingSVGImporter = false
+    @State private var showingFolderPicker = false
+    @State private var exportingTemplate = false
+    @State private var templateDocument: SVGFileDocument?
+    @State private var symlinkNotice: String?
     @State private var svgErrors: [String] = []
     @State private var showingSVGError = false
     @State private var showingTemplateSaved = false
@@ -59,7 +82,7 @@ struct AddEditSheet: View {
                     TextField("Name", text: $name)
                     HStack {
                         TextField("Folder", text: $folderPath)
-                        Button("Browse…", action: pickFolder)
+                        Button("Browse…") { showingFolderPicker = true }
                     }
                     pathBanner
                 }
@@ -103,11 +126,32 @@ struct AddEditSheet: View {
         .frame(width: 520, height: 640)
         .onAppear(perform: populate)
         .fileImporter(
+            isPresented: $showingFolderPicker,
+            allowedContentTypes: [.folder]
+        ) { result in
+            if case .success(let url) = result {
+                folderPath = abbreviate(url.path)
+                if name.isEmpty {
+                    name = url.lastPathComponent
+                }
+            }
+        }
+        .fileImporter(
             isPresented: $showingSVGImporter,
             allowedContentTypes: [UTType(filenameExtension: "svg") ?? .xml]
         ) { result in
             if case .success(let url) = result {
                 importSVG(from: url)
+            }
+        }
+        .fileExporter(
+            isPresented: $exportingTemplate,
+            document: templateDocument,
+            contentType: UTType(filenameExtension: "svg") ?? .xml,
+            defaultFilename: "my-symbol.svg"
+        ) { result in
+            if case .success = result {
+                showingTemplateSaved = true
             }
         }
         .alert("Invalid SVG Template", isPresented: $showingSVGError) {
@@ -140,12 +184,18 @@ struct AddEditSheet: View {
                     systemImage: "exclamationmark.icloud")
                 .font(.caption)
                 .foregroundStyle(.orange)
-                HStack {
-                    Button("Advanced: Create Symlink…", action: createSymlink)
-                        .controlSize(.small)
-                    Text("The symlink lives in the sidebar instead; it can break if the cloud provider re-mounts.")
+                if let symlinkNotice {
+                    Text(symlinkNotice)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                } else {
+                    HStack {
+                        Button("Advanced: Create Symlink", action: createSymlink)
+                            .controlSize(.small)
+                        Text("Creates a link in your home folder; the link lives in the sidebar instead. It can break if the cloud provider re-mounts.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         case .tccProtected:
@@ -231,35 +281,25 @@ struct AddEditSheet: View {
         path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 
-    private func pickFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.resolvesAliases = false  // preserve symlink paths
-        panel.message = "Select a folder to add to the Finder sidebar"
-        panel.prompt = "Select"
-        if panel.runModal() == .OK, let url = panel.url {
-            folderPath = abbreviate(url.path)
-            if name.isEmpty {
-                name = url.lastPathComponent
-            }
-        }
-    }
-
+    /// Creates `~/<folder name>` pointing at the cloud folder; the symlink is
+    /// what the user drags to the sidebar.
     private func createSymlink() {
         let target = (folderPath as NSString).expandingTildeInPath
-        let panel = NSSavePanel()
-        panel.title = "Choose Symlink Location"
-        panel.nameFieldStringValue = URL(fileURLWithPath: target).lastPathComponent
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-        panel.message = "The symlink is what you'll drag to the sidebar. It opens the cloud folder when clicked."
-        panel.prompt = "Create Symlink"
-        guard panel.runModal() == .OK, let linkURL = panel.url else { return }
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let baseName = URL(fileURLWithPath: target).lastPathComponent
+
+        var linkURL = home.appendingPathComponent(baseName)
+        var counter = 2
+        while FileManager.default.fileExists(atPath: linkURL.path) {
+            linkURL = home.appendingPathComponent("\(baseName)-\(counter)")
+            counter += 1
+        }
+
         do {
             try FileManager.default.createSymbolicLink(
                 at: linkURL, withDestinationURL: URL(fileURLWithPath: target))
             folderPath = abbreviate(linkURL.path)
+            symlinkNotice = "Created \(abbreviate(linkURL.path)) → the cloud folder. This link is your sidebar favorite now."
         } catch {
             svgErrors = [error.localizedDescription]
             showingSVGError = true
@@ -299,20 +339,8 @@ struct AddEditSheet: View {
             showingSVGError = true
             return
         }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "svg") ?? .xml]
-        panel.nameFieldStringValue = "my-symbol.svg"
-        panel.message = "Choose where to save the blank SF Symbol template"
-        panel.prompt = "Save Template"
-        if panel.runModal() == .OK, let url = panel.url {
-            do {
-                try data.write(to: url)
-                showingTemplateSaved = true
-            } catch {
-                svgErrors = [error.localizedDescription]
-                showingSVGError = true
-            }
-        }
+        templateDocument = SVGFileDocument(data: data)
+        exportingTemplate = true
     }
 
     private func save() {
