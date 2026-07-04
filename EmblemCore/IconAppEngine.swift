@@ -49,6 +49,13 @@ public actor IconAppEngine {
         try await signAppBundle(at: destinationURL)
         try await registerWithLaunchServices(at: destinationURL)
 
+        // If the manager itself is quarantined (installed from a downloaded
+        // DMG / brew), macOS provenance tracking quarantines everything it
+        // writes — including this bundle, which Gatekeeper then blocks as
+        // "unverified" (generated apps are signed but can't be notarized).
+        // It's our own output; strip the flag.
+        try? await Subprocess.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", destinationURL.path])
+
         // copyItem preserves the template's old mtime, which would make
         // isCurrent(for:) false forever and force a regeneration (and Finder icon
         // flicker) on every check — the likely root cause of upstream issue #4.

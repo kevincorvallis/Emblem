@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2 — 2026-07-04
+
+- Fixed: Gatekeeper blocking generated icon apps ("could not verify … is free
+  of malware") when Emblem itself was installed from a download — macOS
+  provenance tracking quarantined generated bundles; they're now stripped
+  after generation
+
 ## 0.2.1 — 2026-07-03
 
 - Fixed: main-thread hang ("not responding") caused by a feedback loop in the
