@@ -21,12 +21,48 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Build DMG
+      - name: Import Developer ID certificate
+        # Optional: without MACOS_CERT_P12 the build falls back to ad-hoc signing.
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$MACOS_CERT_P12" ]; then
+            echo "No signing certificate secret; release will be ad-hoc signed."
+            exit 0
+          fi
+          KEYCHAIN=build.keychain
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
+          echo "$MACOS_CERT_P12" | base64 --decode > cert.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import cert.p12 -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+          rm cert.p12
+
+      - name: Prepare notary key
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          if [ -n "$NOTARY_KEY_P8" ]; then
+            echo "$NOTARY_KEY_P8" | base64 --decode > notary-key.p8
+          fi
+
+      - name: Build, sign, notarize, package
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_KEY_ISSUER: ${{ secrets.NOTARY_KEY_ISSUER }}
         run: |
           xcodegen generate
+          if [ -f notary-key.p8 ]; then
+            export NOTARY_KEY_PATH="$PWD/notary-key.p8"
+          fi
           ./scripts/build-release.sh
-        env:
-          CODE_SIGN_IDENTITY: "-"
+          rm -f notary-key.p8
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
