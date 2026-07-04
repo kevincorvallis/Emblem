@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4 — 2026-07-04
+
+- UI refinements per HIG: tinted icon wells, capsule status badges,
+  properly sized action menus and buttons, list header, roomier rows
+
 ## 0.2.3 — 2026-07-04
 
 - Fixed: System Settings showed generated apps by file name

@@ -131,6 +131,7 @@ struct AddEditSheet: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(!isValid || saving)
             }
+            .controlSize(.large)
             .padding()
         }
         .frame(width: 520, height: 700)

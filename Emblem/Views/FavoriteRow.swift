@@ -13,12 +13,11 @@ struct FavoriteRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            iconPreview
-                .frame(width: 28, height: 28)
+            iconWell
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(favorite.name)
-                    .font(.headline)
+                    .font(.body.weight(.semibold))
                 Text(favorite.folderPath)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -26,7 +25,7 @@ struct FavoriteRow: View {
                     .truncationMode(.middle)
             }
 
-            Spacer()
+            Spacer(minLength: 16)
 
             statusBadge
 
@@ -45,11 +44,16 @@ struct FavoriteRow: View {
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 17))
+                    .foregroundStyle(.secondary)
             }
             .menuStyle(.borderlessButton)
-            .frame(width: 30)
+            .menuIndicator(.hidden)
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+            .help("Actions for \(favorite.name)")
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
         .confirmationDialog(
             "Remove “\(favorite.name)”?",
             isPresented: $confirmingDelete
@@ -62,40 +66,67 @@ struct FavoriteRow: View {
         }
     }
 
+    private var iconWell: some View {
+        Group {
+            if favorite.iconType == .custom, let svgPath = favorite.customSVGPath {
+                SVGThumbnailView(url: store.customIconURL(relativePath: svgPath), size: 20)
+            } else {
+                Image(systemName: favorite.iconValue)
+                    .font(.system(size: 17, weight: .medium))
+            }
+        }
+        .foregroundStyle(Color.accentColor)
+        .frame(width: 36, height: 36)
+        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+    }
+
     @ViewBuilder
-    private var iconPreview: some View {
-        if favorite.iconType == .custom, let svgPath = favorite.customSVGPath {
-            SVGThumbnailView(url: store.customIconURL(relativePath: svgPath), size: 24)
-                .foregroundStyle(Color.accentColor)
-        } else {
-            Image(systemName: favorite.iconValue)
-                .font(.system(size: 18))
-                .foregroundStyle(Color.accentColor)
+    private var statusBadge: some View {
+        switch status {
+        case .generating:
+            capsule(color: .secondary) {
+                ProgressView().controlSize(.mini)
+                Text("Generating…")
+            }
+        case .active:
+            capsule(color: .green) {
+                Image(systemName: "checkmark.circle.fill")
+                Text("Active")
+            }
+        case .awaitingSetup:
+            Button(action: onSetup) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.right.circle.fill")
+                    Text("Finish Setup")
+                }
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.15), in: Capsule())
+                .foregroundStyle(.orange)
+            }
+            .buttonStyle(.plain)
+            .help("Complete the remaining setup steps")
+        case .folderMissing:
+            capsule(color: .red) {
+                Image(systemName: "questionmark.folder.fill")
+                Text("Folder Missing")
+            }
+        case .error(let message):
+            capsule(color: .red) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("Error")
+            }
+            .help(message)
         }
     }
 
-    private var statusBadge: some View {
-        HStack(spacing: 5) {
-            switch status {
-            case .generating:
-                ProgressView().controlSize(.small)
-                Text("Generating…")
-            case .active:
-                Circle().fill(.green).frame(width: 8, height: 8)
-                Text("Active")
-            case .awaitingSetup:
-                Circle().fill(.orange).frame(width: 8, height: 8)
-                Button("Finish Setup", action: onSetup)
-                    .buttonStyle(.link)
-            case .folderMissing:
-                Circle().fill(.red).frame(width: 8, height: 8)
-                Text("Folder Missing")
-            case .error(let message):
-                Circle().fill(.red).frame(width: 8, height: 8)
-                Text("Error").help(message)
-            }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
+    private func capsule(color: Color, @ViewBuilder content: () -> some View) -> some View {
+        HStack(spacing: 4, content: content)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.12), in: Capsule())
+            .foregroundStyle(color)
     }
 }

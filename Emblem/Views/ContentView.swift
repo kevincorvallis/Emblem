@@ -87,13 +87,22 @@ struct ContentView: View {
 
     private var favoritesList: some View {
         List {
-            ForEach(store.favorites) { favorite in
-                FavoriteRow(
-                    favorite: favorite,
-                    status: store.statuses[favorite.id] ?? .awaitingSetup,
-                    onEdit: { editingFavorite = favorite },
-                    onSetup: { setupFavorite = favorite }
-                )
+            Section {
+                ForEach(store.favorites) { favorite in
+                    FavoriteRow(
+                        favorite: favorite,
+                        status: store.statuses[favorite.id] ?? .awaitingSetup,
+                        onEdit: { editingFavorite = favorite },
+                        onSetup: { setupFavorite = favorite }
+                    )
+                }
+            } header: {
+                Text(store.favorites.count == 1
+                     ? "1 favorite"
+                     : "\(store.favorites.count) favorites")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
             }
         }
         .listStyle(.inset)
